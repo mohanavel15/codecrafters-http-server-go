@@ -67,31 +67,36 @@ func Handler(conn net.Conn) {
 	buf := make([]byte, 1024)
 	n, err := conn.Read(buf)
 	if err != nil {
-		fmt.Println(err.Error())
+		return
 	}
 	buf = buf[:n]
 
-	request_str := string(buf)
-	lines := strings.Split(request_str, "\r\n")
-	status_line := strings.Split(lines[0], " ")
-
-	path := status_line[1]
+	request := ParseRequest(string(buf))
 
 	res := NewResponse()
 
-	if path == "/" {
+	if request.Path == "/" {
 		res.StatusCode = 200
 		res.StatusStr = "OK"
-	} else if strings.Contains(path, "/echo/") {
+	} else if strings.Contains(request.Path, "/echo/") {
 		res.StatusCode = 200
 		res.StatusStr = "OK"
 
-		word := strings.Split(path, "/")[2]
+		word := strings.Split(request.Path, "/")[2]
 
 		res.AddHeader("Content-Type", "text/plain")
 		res.AddHeader("Content-Length", fmt.Sprint(len(word)))
 		res.Body = word
 
+	} else if request.Path == "/user-agent" {
+		res.StatusCode = 200
+		res.StatusStr = "OK"
+
+		userAgent := request.Headers["User-Agent"]
+
+		res.AddHeader("Content-Type", "text/plain")
+		res.AddHeader("Content-Length", fmt.Sprint(len(userAgent)))
+		res.Body = userAgent
 	} else {
 		res.StatusCode = 404
 		res.StatusStr = "Not Found"
