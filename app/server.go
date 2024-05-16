@@ -63,19 +63,31 @@ func Handler(conn net.Conn) {
 			filename := strings.Split(request.Path, "/")[2]
 			filepath := fmt.Sprintf("%s/%s", dir, filename)
 
-			raw, err := os.ReadFile(filepath)
-			if err != nil {
-				res.StatusCode = 404
-				res.StatusStr = "Not Found"
-			} else {
-				res.StatusCode = 200
-				res.StatusStr = "OK"
+			if request.Method == "GET" {
+				raw, err := os.ReadFile(filepath)
+				if err != nil {
+					res.StatusCode = 404
+					res.StatusStr = "Not Found"
+				} else {
+					res.StatusCode = 200
+					res.StatusStr = "OK"
 
-				res.AddHeader("Content-Type", "application/octet-stream")
-				res.AddHeader("Content-Length", fmt.Sprint(len(raw)))
-				res.Body = string(raw)
+					res.AddHeader("Content-Type", "application/octet-stream")
+					res.AddHeader("Content-Length", fmt.Sprint(len(raw)))
+					res.Body = string(raw)
+				}
+			} else if request.Method == "POST" {
+				err := os.WriteFile(filepath, []byte(request.Body), 0644)
+				if err != nil {
+					res.StatusCode = 404
+					res.StatusStr = "Not Found"
+				} else {
+					res.StatusCode = 201
+					res.StatusStr = "Created"
+				}
 			}
 		}
+
 	} else if request.Path == "/user-agent" {
 		res.StatusCode = 200
 		res.StatusStr = "OK"

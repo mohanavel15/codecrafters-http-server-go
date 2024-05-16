@@ -7,6 +7,7 @@ type Request struct {
 	Path        string
 	HttpVersion string
 	Headers     map[string]string
+	Body        string
 }
 
 func ParseRequest(request_str string) Request {
@@ -28,6 +29,10 @@ func ParseRequest(request_str string) Request {
 		val := strings.TrimSpace(header[1])
 		request.Headers[key] = val
 		idx += 1
+	}
+
+	if idx+1 <= len(lines) {
+		request.Body = lines[idx+1]
 	}
 
 	return request
