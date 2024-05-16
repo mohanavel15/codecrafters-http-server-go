@@ -18,6 +18,60 @@ func main() {
 		os.Exit(1)
 	}
 
+	dir := "./"
+	if len(os.Args) >= 3 && os.Args[1] == "--directory" {
+		dir = os.Args[2]
+	}
+
+	r := NewRouter()
+	r.AddRoute("GET", "/", func(req Request, res *Response) {
+		// Nothing
+	})
+
+	r.AddRoute("GET", "/user-agent", func(req Request, res *Response) {
+		userAgent := req.Headers["User-Agent"]
+
+		res.AddHeader("Content-Type", "text/plain")
+		res.AddHeader("Content-Length", fmt.Sprint(len(userAgent)))
+		res.Body = userAgent
+	})
+
+	r.AddRoute("GET", "/echo/{any}", func(req Request, res *Response) {
+		word := strings.Split(req.Path, "/")[2]
+		res.Body = word
+	})
+
+	r.AddRoute("GET", "/files/{any}", func(req Request, res *Response) {
+		filename := strings.Split(req.Path, "/")[2]
+		filepath := fmt.Sprintf("%s/%s", dir, filename)
+
+		raw, err := os.ReadFile(filepath)
+		if err != nil {
+			res.StatusCode = 500
+			res.StatusStr = "Internal Server Error"
+		} else {
+			res.StatusCode = 200
+			res.StatusStr = "OK"
+
+			res.AddHeader("Content-Type", "application/octet-stream")
+			res.Body = string(raw)
+		}
+	})
+
+	r.AddRoute("POST", "/files/{any}", func(req Request, res *Response) {
+		filename := strings.Split(req.Path, "/")[2]
+		filepath := fmt.Sprintf("%s/%s", dir, filename)
+
+		res.StatusCode = 201
+		res.StatusStr = "Created"
+
+		err := os.WriteFile(filepath, []byte(req.Body), 0644)
+		if err != nil {
+			res.StatusCode = 500
+			res.StatusStr = "Internal Server Error"
+		}
+	})
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -25,11 +79,11 @@ func main() {
 			os.Exit(1)
 		}
 
-		go Handler(conn)
+		go Handler(conn, &r)
 	}
 }
 
-func Handler(conn net.Conn) {
+func Handler(conn net.Conn, router *Router) {
 	defer conn.Close()
 
 	buf := make([]byte, 1024)
@@ -37,90 +91,32 @@ func Handler(conn net.Conn) {
 	if err != nil {
 		return
 	}
+
 	buf = buf[:n]
 
-	request := ParseRequest(string(buf))
+	req := ParseRequest(string(buf))
 
 	res := NewResponse()
+	res.StatusCode = 404
+	res.StatusStr = "Not Found"
+	res.AddHeader("Content-Type", "text/plain")
 
-	if request.Path == "/" {
-		res.StatusCode = 200
-		res.StatusStr = "OK"
-	} else if strings.Contains(request.Path, "/echo/") {
-		res.StatusCode = 200
-		res.StatusStr = "OK"
+	router.Handle(req, &res)
 
-		shouldEncode := false
-		if encode, ok := request.Headers["Accept-Encoding"]; ok {
-			if strings.Contains(encode, "gzip") {
-				shouldEncode = true
-				res.AddHeader("Content-Encoding", "gzip")
-			}
-		}
+	if encode, ok := req.Headers["Accept-Encoding"]; ok {
+		if strings.Contains(encode, "gzip") {
+			res.AddHeader("Content-Encoding", "gzip")
+			var buf bytes.Buffer
 
-		word := strings.Split(request.Path, "/")[2]
-
-		res.AddHeader("Content-Type", "text/plain")
-
-		if shouldEncode {
-			var b bytes.Buffer
-			w := gzip.NewWriter(&b)
-			w.Write([]byte(word))
+			w := gzip.NewWriter(&buf)
+			w.Write([]byte(res.Body))
 			w.Close()
 
-			word = b.String()
+			res.Body = buf.String()
 		}
-
-		res.AddHeader("Content-Length", fmt.Sprint(len(word)))
-		res.Body = word
-
-	} else if strings.Contains(request.Path, "/files/") {
-		if len(os.Args) < 3 {
-			res.StatusCode = 404
-			res.StatusStr = "Not Found"
-		} else {
-			dir := os.Args[2]
-			filename := strings.Split(request.Path, "/")[2]
-			filepath := fmt.Sprintf("%s/%s", dir, filename)
-
-			if request.Method == "GET" {
-				raw, err := os.ReadFile(filepath)
-				if err != nil {
-					res.StatusCode = 404
-					res.StatusStr = "Not Found"
-				} else {
-					res.StatusCode = 200
-					res.StatusStr = "OK"
-
-					res.AddHeader("Content-Type", "application/octet-stream")
-					res.AddHeader("Content-Length", fmt.Sprint(len(raw)))
-					res.Body = string(raw)
-				}
-			} else if request.Method == "POST" {
-				err := os.WriteFile(filepath, []byte(request.Body), 0644)
-				if err != nil {
-					res.StatusCode = 404
-					res.StatusStr = "Not Found"
-				} else {
-					res.StatusCode = 201
-					res.StatusStr = "Created"
-				}
-			}
-		}
-
-	} else if request.Path == "/user-agent" {
-		res.StatusCode = 200
-		res.StatusStr = "OK"
-
-		userAgent := request.Headers["User-Agent"]
-
-		res.AddHeader("Content-Type", "text/plain")
-		res.AddHeader("Content-Length", fmt.Sprint(len(userAgent)))
-		res.Body = userAgent
-	} else {
-		res.StatusCode = 404
-		res.StatusStr = "Not Found"
 	}
+
+	res.AddHeader("Content-Length", fmt.Sprint(len(res.Body)))
 
 	conn.Write([]byte(res.Compose()))
 }
