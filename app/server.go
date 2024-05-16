@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	// Uncomment this block to pass the first stage
 )
 
@@ -29,6 +30,21 @@ func main() {
 }
 
 func Handler(conn net.Conn) {
-	conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-	conn.Close()
+	defer conn.Close()
+
+	buf := make([]byte, 1024)
+	n, err := conn.Read(buf)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	buf = buf[:n]
+
+	request_str := string(buf)
+	lines := strings.Split(request_str, "\r\n")
+	status_line := strings.Split(lines[0], " ")
+	if status_line[1] == "/" {
+		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	} else {
+		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+	}
 }
