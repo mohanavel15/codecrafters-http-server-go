@@ -48,6 +48,12 @@ func Handler(conn net.Conn) {
 		res.StatusCode = 200
 		res.StatusStr = "OK"
 
+		if encode, ok := request.Headers["Accept-Encoding"]; ok {
+			if encode == "gzip" {
+				res.AddHeader("Content-Encoding", encode)
+			}
+		}
+
 		word := strings.Split(request.Path, "/")[2]
 
 		res.AddHeader("Content-Type", "text/plain")
