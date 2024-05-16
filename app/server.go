@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"net"
 	"os"
@@ -48,8 +50,10 @@ func Handler(conn net.Conn) {
 		res.StatusCode = 200
 		res.StatusStr = "OK"
 
+		shouldEncode := false
 		if encode, ok := request.Headers["Accept-Encoding"]; ok {
 			if strings.Contains(encode, "gzip") {
+				shouldEncode = true
 				res.AddHeader("Content-Encoding", "gzip")
 			}
 		}
@@ -57,6 +61,16 @@ func Handler(conn net.Conn) {
 		word := strings.Split(request.Path, "/")[2]
 
 		res.AddHeader("Content-Type", "text/plain")
+
+		if shouldEncode {
+			var b bytes.Buffer
+			w := gzip.NewWriter(&b)
+			w.Write([]byte("hello, world\n"))
+			w.Close()
+
+			word = b.String()
+		}
+
 		res.AddHeader("Content-Length", fmt.Sprint(len(word)))
 		res.Body = word
 
