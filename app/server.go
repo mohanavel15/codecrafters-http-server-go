@@ -5,14 +5,10 @@ import (
 	"net"
 	"os"
 	"strings"
-	// Uncomment this block to pass the first stage
 )
 
 func main() {
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
-
-	// Uncomment this block to pass the first stage
 
 	l, err := net.Listen("tcp", "0.0.0.0:4221")
 	if err != nil {
@@ -58,6 +54,28 @@ func Handler(conn net.Conn) {
 		res.AddHeader("Content-Length", fmt.Sprint(len(word)))
 		res.Body = word
 
+	} else if strings.Contains(request.Path, "/files/") {
+		if len(os.Args) < 3 {
+			res.StatusCode = 404
+			res.StatusStr = "Not Found"
+		} else {
+			dir := os.Args[2]
+			filename := strings.Split(request.Path, "/")[2]
+			filepath := fmt.Sprintf("%s/%s", dir, filename)
+
+			raw, err := os.ReadFile(filepath)
+			if err != nil {
+				res.StatusCode = 404
+				res.StatusStr = "Not Found"
+			} else {
+				res.StatusCode = 200
+				res.StatusStr = "OK"
+
+				res.AddHeader("Content-Type", "application/octet-stream")
+				res.AddHeader("Content-Length", fmt.Sprint(len(raw)))
+				res.Body = string(raw)
+			}
+		}
 	} else if request.Path == "/user-agent" {
 		res.StatusCode = 200
 		res.StatusStr = "OK"
