@@ -50,7 +50,7 @@ func Handler(conn net.Conn) {
 
 		if encode, ok := request.Headers["Accept-Encoding"]; ok {
 			if strings.Contains(encode, "gzip") {
-				res.AddHeader("Content-Encoding", encode)
+				res.AddHeader("Content-Encoding", "gzip")
 			}
 		}
 
