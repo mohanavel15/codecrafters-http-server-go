@@ -29,6 +29,38 @@ func main() {
 	Handler(conn)
 }
 
+type Response struct {
+	HttpVersion string
+	StatusCode  int
+	StatusStr   string
+	Header      map[string]string
+	Body        string
+}
+
+func NewResponse() Response {
+	return Response{
+		HttpVersion: "HTTP/1.1",
+		StatusCode:  0,
+		StatusStr:   "",
+		Header:      map[string]string{},
+		Body:        "",
+	}
+}
+
+func (r *Response) AddHeader(key, val string) {
+	r.Header[key] = val
+}
+
+func (r *Response) Compose() string {
+	res := fmt.Sprintf("%s %d %s\r\n", r.HttpVersion, r.StatusCode, r.StatusStr)
+	for key, val := range r.Header {
+		res += fmt.Sprintf("%s: %s\r\n", key, val)
+	}
+	res += "\r\n"
+	res += r.Body
+	return res
+}
+
 func Handler(conn net.Conn) {
 	defer conn.Close()
 
@@ -42,9 +74,28 @@ func Handler(conn net.Conn) {
 	request_str := string(buf)
 	lines := strings.Split(request_str, "\r\n")
 	status_line := strings.Split(lines[0], " ")
-	if status_line[1] == "/" {
-		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+
+	path := status_line[1]
+
+	res := NewResponse()
+
+	if path == "/" {
+		res.StatusCode = 200
+		res.StatusStr = "OK"
+	} else if strings.Contains(path, "/echo/") {
+		res.StatusCode = 200
+		res.StatusStr = "OK"
+
+		word := strings.Split(path, "/")[2]
+
+		res.AddHeader("Content-Type", "text/plain")
+		res.AddHeader("Content-Length", fmt.Sprint(len(word)))
+		res.Body = word
+
 	} else {
-		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+		res.StatusCode = 404
+		res.StatusStr = "Not Found"
 	}
+
+	conn.Write([]byte(res.Compose()))
 }
