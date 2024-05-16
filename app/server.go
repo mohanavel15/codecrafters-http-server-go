@@ -65,7 +65,7 @@ func Handler(conn net.Conn) {
 		if shouldEncode {
 			var b bytes.Buffer
 			w := gzip.NewWriter(&b)
-			w.Write([]byte("hello, world\n"))
+			w.Write([]byte(word))
 			w.Close()
 
 			word = b.String()
