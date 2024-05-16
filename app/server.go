@@ -47,12 +47,9 @@ func main() {
 
 		raw, err := os.ReadFile(filepath)
 		if err != nil {
-			res.StatusCode = 500
-			res.StatusStr = "Internal Server Error"
+			res.StatusCode = 404
+			res.StatusStr = "Not Found"
 		} else {
-			res.StatusCode = 200
-			res.StatusStr = "OK"
-
 			res.AddHeader("Content-Type", "application/octet-stream")
 			res.Body = string(raw)
 		}
